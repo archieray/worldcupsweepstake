@@ -17,6 +17,12 @@
       "away": "Bosnia and Herzegovina",
       "home_score": 1,
       "away_score": 1
+    },
+    "Paraguay|United States": {
+      "home": "United States",
+      "away": "Paraguay",
+      "home_score": 4,
+      "away_score": 1
     }
   },
   "knockout": {}
