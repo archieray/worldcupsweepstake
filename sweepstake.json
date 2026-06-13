@@ -1,0 +1,16 @@
+{
+  "players": {
+    "Archie":  ["Spain", "Mexico", "Egypt", "Ghana"],
+    "Ben":     ["Argentina", "Senegal", "Algeria", "Uzbekistan"],
+    "Dan":     ["Netherlands", "Australia", "DR Congo", "Qatar"],
+    "Hywel":   ["Croatia", "Austria", "Czechia", "Iraq"],
+    "Jon":     ["England", "Switzerland", "Canada", "Cape Verde"],
+    "Krish":   ["France", "Iran", "Panama", "Saudi Arabia"],
+    "Lucca":   ["Germany", "Türkiye", "Norway", "South Africa"],
+    "Toby":    ["Morocco", "Japan", "Ivory Coast", "New Zealand"],
+    "Will H":  ["Portugal", "United States", "Sweden", "Curaçao"],
+    "Will P":  ["Colombia", "Uruguay", "Paraguay", "Haiti"],
+    "Will S":  ["Brazil", "South Korea", "Scotland", "Jordan"],
+    "Will T":  ["Belgium", "Ecuador", "Tunisia", "Bosnia and Herzegovina"]
+  }
+}

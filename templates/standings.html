@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Sweepstake Standings <span>click a player to expand teams</span></h1>
+
+<table class="standings-table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Player</th>
+      <th style="text-align:right">Exp. pts</th>
+    </tr>
+  </thead>
+  {% for row in rows %}
+  <tbody>
+    <tr class="player-row" onclick="toggle('bd-{{ loop.index }}')">
+      <td class="rank rank-{{ loop.index }}">{{ loop.index }}</td>
+      <td>
+        <div class="player-name">{{ row.player }}</div>
+        <div class="player-teams">{{ row.teams | map(attribute='name') | join(' · ') }}</div>
+      </td>
+      <td class="pts">
+        {{ row.total }}<br>
+        <span class="pts-label">pts</span>
+      </td>
+    </tr>
+    <tr class="team-breakdown" id="bd-{{ loop.index }}">
+      <td colspan="3">
+        <div class="team-breakdown-inner">
+          <div class="team-grid">
+            {% for t in row.teams %}
+            <div class="team-card-mini">
+              <div class="team-name">{{ t.name }}</div>
+              <div class="team-meta">Group {{ t.group }} · ELO {{ t.elo }}</div>
+              <div class="team-exp">{{ t.exp }} pts · {{ t.win }}% win</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+
+<div class="scoring-key">
+  <div class="scoring-key-title">Points scoring</div>
+  <div class="scoring-key-items">
+    <span>Group exit <strong>0</strong></span>
+    <span>Round of 32 <strong>1</strong></span>
+    <span>Round of 16 <strong>3</strong></span>
+    <span>Quarter-final <strong>6</strong></span>
+    <span>Semi-final <strong>10</strong></span>
+    <span>Final <strong>15</strong></span>
+    <span>Winner <strong>25</strong></span>
+  </div>
+</div>
+
+<script>
+function toggle(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+</script>
+{% endblock %}

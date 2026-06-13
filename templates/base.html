@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WC 2026 Sweepstake</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo">⚽ WC 2026 Sweepstake</div>
+      <nav>
+        <a href="/" class="{% if active == 'standings' %}active{% endif %}">Standings</a>
+        <a href="/teams" class="{% if active == 'teams' %}active{% endif %}">Teams</a>
+        <a href="/fixtures" class="{% if active == 'fixtures' %}active{% endif %}">Fixtures</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>Powered by a 100k-simulation Poisson model · Data: football-data.org</p>
+  </footer>
+</body>
+</html>

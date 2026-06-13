@@ -1,0 +1,23 @@
+{
+  "group": {
+    "Mexico|South Africa": {
+      "home": "Mexico",
+      "away": "South Africa",
+      "home_score": 2,
+      "away_score": 0
+    },
+    "Czechia|South Korea": {
+      "home": "Czechia",
+      "away": "South Korea",
+      "home_score": 1,
+      "away_score": 2
+    },
+    "Bosnia and Herzegovina|Canada": {
+      "home": "Canada",
+      "away": "Bosnia and Herzegovina",
+      "home_score": 1,
+      "away_score": 1
+    }
+  },
+  "knockout": {}
+}

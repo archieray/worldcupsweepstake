@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Upcoming Fixtures <span>next 10 matches · win % from model</span></h1>
+
+{% if not has_api %}
+<div class="notice">
+  Live fixtures require a free API key from
+  <a href="https://www.football-data.org/client/register" target="_blank">football-data.org</a>.
+  Set <code>FOOTBALL_DATA_API_KEY=your_key</code> before starting the server.
+</div>
+{% endif %}
+
+{% if fixtures %}
+<div class="fixtures-list">
+  {% for f in fixtures %}
+  <div class="fixture-card">
+    <div class="fixture-meta">{{ f.date }} · {{ f.time }}{% if f.matchday %} · Matchday {{ f.matchday }}{% endif %}</div>
+    <div class="fixture-teams">
+      <div class="fixture-team">
+        <span class="fixture-team-name">{{ f.home }}</span>
+        <span class="fixture-team-owner">{{ f.home_owner }}</span>
+        <span class="fixture-team-elo">ELO {{ f.home_elo }}</span>
+      </div>
+      <div class="fixture-vs">vs</div>
+      <div class="fixture-team right">
+        <span class="fixture-team-name">{{ f.away }}</span>
+        <span class="fixture-team-owner">{{ f.away_owner }}</span>
+        <span class="fixture-team-elo">ELO {{ f.away_elo }}</span>
+      </div>
+    </div>
+    <div class="fixture-odds">
+      <span class="odds-pct-home">{{ f.home_pct }}%</span>
+      <div class="odds-bar">
+        <div class="odds-home" style="width:{{ f.home_pct }}%"></div>
+        <div class="odds-draw" style="width:{{ f.draw_pct }}%"></div>
+        <div class="odds-away" style="width:{{ f.away_pct }}%"></div>
+      </div>
+      <span class="odds-label">{{ f.draw_pct }}% D</span>
+      <span class="odds-pct-away">{{ f.away_pct }}%</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="no-fixtures">
+  {% if has_api %}
+    No upcoming fixtures found — the tournament may be between stages.
+  {% else %}
+    Add your API key to see live fixtures.
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

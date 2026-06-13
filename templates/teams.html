@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Teams <span>all 48 squads · live stats where available</span></h1>
+
+{% if not has_api %}
+<div class="notice">
+  Live goals &amp; scorers require a free API key from
+  <a href="https://www.football-data.org/client/register" target="_blank">football-data.org</a>.
+  Set <code>FOOTBALL_DATA_API_KEY=your_key</code> before starting the server.
+</div>
+{% endif %}
+
+{% for letter, teams in groups %}
+<div class="group-section">
+  <div class="group-label">Group {{ letter }}</div>
+  <div class="team-grid-full">
+    {% for t in teams %}
+    <div class="team-card">
+      <div class="team-card-header">
+        <div class="team-card-name">{{ t.name }}</div>
+        <div class="team-card-owner">{{ t.owner }}</div>
+      </div>
+      <div class="team-card-stats">
+        <span>ELO <span class="stat-hi">{{ t.elo }}</span></span>
+        <span>Goals <span class="stat-hi">{{ t.goals }}</span></span>
+        <span>Exp <span class="stat-hi">{{ t.exp }} pts</span></span>
+      </div>
+
+      <div class="bar-row">
+        <span>Win</span>
+        <div class="bar"><div class="bar-fill" style="width:{{ [t.win * 4, 100] | min }}%"></div></div>
+        <span>{{ t.win }}%</span>
+      </div>
+      <div class="bar-row">
+        <span>R16</span>
+        <div class="bar"><div class="bar-fill" style="width:{{ t.r16 }}%"></div></div>
+        <span>{{ t.r16 }}%</span>
+      </div>
+
+      {% if t.scorers %}
+      <div class="scorers-list">
+        {% for s in t.scorers %}
+        <div class="scorer"><span class="goals">{{ s.goals }}</span>{{ s.name }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

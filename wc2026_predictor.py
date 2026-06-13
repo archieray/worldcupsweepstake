@@ -10,7 +10,9 @@ approach of Gilch (2022). Full fixed-bracket Monte Carlo simulation of the
 """
 
 import csv
+import json
 import math
+import os
 import numpy as np
 from scipy.optimize import minimize
 from collections import defaultdict
@@ -19,7 +21,8 @@ from datetime import date
 
 # ── Config ───────────────────────────────────────────────────────────────────
 DATA_DIR       = '/Users/archie-raythompson/Sweepstake'
-N_SIMS         = 10_000
+CACHE_PATH     = f'{DATA_DIR}/wc2026_cache.json'
+N_SIMS         = 100_000
 RANDOM_SEED    = 42
 CUTOFF_DATE    = '2016-01-01'
 HALF_LIFE_DAYS = 365 * 3
@@ -131,6 +134,29 @@ def load_data():
     with open(f'{DATA_DIR}/teams.csv') as f:
         current_elo = {r['team']: float(r['elo']) for r in csv.DictReader(f)}
     return results, current_elo
+
+def _results_mtime():
+    return os.path.getmtime(f'{DATA_DIR}/results.csv')
+
+def load_cache():
+    if not os.path.exists(CACHE_PATH):
+        return None
+    with open(CACHE_PATH) as f:
+        c = json.load(f)
+    if abs(c.get('mtime', 0) - _results_mtime()) > 1:
+        return None
+    return c['regressions']
+
+def save_cache(regressions):
+    with open(CACHE_PATH, 'w') as f:
+        json.dump({'mtime': _results_mtime(), 'regressions': regressions}, f)
+
+def load_known_results():
+    path = f'{DATA_DIR}/match_results.json'
+    if not os.path.exists(path):
+        return {'group': {}, 'knockout': {}}
+    with open(path) as f:
+        return json.load(f)
 
 # ── Historical ELO computation ────────────────────────────────────────────────
 
@@ -297,23 +323,39 @@ def sim_knockout_match(lam_h, lam_a, rng):
 
 # ── Group stage ───────────────────────────────────────────────────────────────
 
-def sim_group_stage(strengths, current_elo, rng):
+def sim_group_stage(strengths, current_elo, rng, known_results=None, predrawn_goals=None):
     """
     Simulate all 12 groups. Returns:
         standings  : {team: {pts, gf, ga, gd, group, group_rank}}
         group_tables: {'A': [1st, 2nd, 3rd, 4th], ...}
+    predrawn_goals: list of (gh, ga) for all 72 matches in GROUPS iteration order;
+                    overridden by known_results entries where present.
     """
+    known_group = (known_results or {}).get('group', {})
+
     standings = {}
     for letter, members in GROUPS.items():
         for team in members:
             standings[team] = {'pts': 0, 'gf': 0, 'ga': 0, 'gd': 0,
                                'group': letter}
 
+    match_idx = 0
     group_tables = {}
     for letter, members in GROUPS.items():
         for h, a in combinations(members, 2):
-            lam_h, lam_a = strengths(h, a)
-            gh, ga = sim_match(lam_h, lam_a, rng)
+            key = '|'.join(sorted([h, a]))
+            if key in known_group:
+                rec = known_group[key]
+                if rec['home'] == h:
+                    gh, ga = rec['home_score'], rec['away_score']
+                else:
+                    gh, ga = rec['away_score'], rec['home_score']
+            elif predrawn_goals is not None:
+                gh, ga = int(predrawn_goals[match_idx][0]), int(predrawn_goals[match_idx][1])
+            else:
+                lam_h, lam_a = strengths(h, a)
+                gh, ga = sim_match(lam_h, lam_a, rng)
+            match_idx += 1
 
             standings[h]['gf'] += gh; standings[h]['ga'] += ga
             standings[a]['gf'] += ga; standings[a]['ga'] += gh
@@ -418,16 +460,20 @@ def resolve_r32_bracket(group_tables, third_assignment):
 
 # ── Generic knockout round ────────────────────────────────────────────────────
 
-def sim_knockout_round(matchups, strengths, rng):
+def sim_knockout_round(matchups, strengths, rng, known_results=None):
     """
     matchups: [(slot_id, team_a, team_b), ...]
     Returns: {slot_id: winning_team}
     """
+    known_ko = (known_results or {}).get('knockout', {})
     winners = {}
     for slot_id, t1, t2 in matchups:
-        lam1, lam2 = strengths(t1, t2)
-        w = sim_knockout_match(lam1, lam2, rng)
-        winners[slot_id] = t1 if w == 0 else t2
+        if slot_id in known_ko:
+            winners[slot_id] = known_ko[slot_id]['winner']
+        else:
+            lam1, lam2 = strengths(t1, t2)
+            w = sim_knockout_match(lam1, lam2, rng)
+            winners[slot_id] = t1 if w == 0 else t2
     return winners
 
 def build_next_round(pair_list, prev_winners, round_prefix):
@@ -447,12 +493,12 @@ def build_next_round(pair_list, prev_winners, round_prefix):
 
 STAGE_ORDER = ['Group', 'R32', 'R16', 'QF', 'SF', '3rd', 'Final', 'Winner']
 
-def sim_tournament(strengths, current_elo, rng):
+def sim_tournament(strengths, current_elo, rng, known_results=None, predrawn_goals=None):
     all_teams = [t for members in GROUPS.values() for t in members]
     result    = {t: 'Group' for t in all_teams}
 
     # ── Group stage ───────────────────────────────────────────────────────────
-    standings, group_tables = sim_group_stage(strengths, current_elo, rng)
+    standings, group_tables = sim_group_stage(strengths, current_elo, rng, known_results, predrawn_goals)
     ranked_thirds = pick_best_third(standings, group_tables, current_elo, rng)
     third_assignment = assign_third_place_teams(ranked_thirds, standings)
 
@@ -466,25 +512,25 @@ def sim_tournament(strengths, current_elo, rng):
 
     # ── Round of 32 ──────────────────────────────────────────────────────────
     r32_matchups = resolve_r32_bracket(group_tables, third_assignment)
-    r32_winners  = sim_knockout_round(r32_matchups, strengths, rng)
+    r32_winners  = sim_knockout_round(r32_matchups, strengths, rng, known_results)
     for t in r32_winners.values():
         result[t] = 'R16'
 
     # ── Round of 16 ──────────────────────────────────────────────────────────
     r16_matchups = build_next_round(R16_PAIRS, r32_winners, 'R16-')
-    r16_winners  = sim_knockout_round(r16_matchups, strengths, rng)
+    r16_winners  = sim_knockout_round(r16_matchups, strengths, rng, known_results)
     for t in r16_winners.values():
         result[t] = 'QF'
 
     # ── Quarter-finals ────────────────────────────────────────────────────────
     qf_matchups = build_next_round(QF_PAIRS, r16_winners, 'QF')
-    qf_winners  = sim_knockout_round(qf_matchups, strengths, rng)
+    qf_winners  = sim_knockout_round(qf_matchups, strengths, rng, known_results)
     for t in qf_winners.values():
         result[t] = 'SF'
 
     # ── Semi-finals ───────────────────────────────────────────────────────────
     sf_matchups = build_next_round(SF_PAIRS, qf_winners, 'SF')
-    sf_winners  = sim_knockout_round(sf_matchups, strengths, rng)
+    sf_winners  = sim_knockout_round(sf_matchups, strengths, rng, known_results)
     sf_losers   = [t2 if w == t1 else t1
                    for (_, t1, t2), w in zip(sf_matchups, sf_winners.values())]
     for t in sf_losers:
@@ -494,20 +540,36 @@ def sim_tournament(strengths, current_elo, rng):
 
     # ── Final ─────────────────────────────────────────────────────────────────
     final_matchup = [('Final', list(sf_winners.values())[0], list(sf_winners.values())[1])]
-    final_winner  = sim_knockout_round(final_matchup, strengths, rng)
+    final_winner  = sim_knockout_round(final_matchup, strengths, rng, known_results)
     result[final_winner['Final']] = 'Winner'
 
     return result
 
 # ── Monte Carlo ───────────────────────────────────────────────────────────────
 
-def run_simulations(strengths_fn, current_elo, n_sims=N_SIMS):
+def precompute_group_lambdas(strengths):
+    """Pre-compute all 72 group-match lambda pairs in GROUPS iteration order."""
+    lams_h, lams_a = [], []
+    for letter, members in GROUPS.items():
+        for h, a in combinations(members, 2):
+            lh, la = strengths(h, a)
+            lams_h.append(lh)
+            lams_a.append(la)
+    return np.array(lams_h), np.array(lams_a)
+
+def run_simulations(strengths_fn, current_elo, n_sims=N_SIMS, known_results=None):
     rng       = np.random.default_rng(RANDOM_SEED)
     all_teams = [t for members in GROUPS.values() for t in members]
     counts    = {stage: defaultdict(int) for stage in STAGE_ORDER}
 
-    for _ in range(n_sims):
-        result = sim_tournament(strengths_fn, current_elo, rng)
+    # Batch-draw all group-stage goals upfront (72 matches × n_sims)
+    lams_h, lams_a = precompute_group_lambdas(strengths_fn)
+    all_goals_h = rng.poisson(np.outer(lams_h, np.ones(n_sims)))  # (72, n_sims)
+    all_goals_a = rng.poisson(np.outer(lams_a, np.ones(n_sims)))  # (72, n_sims)
+
+    for i in range(n_sims):
+        predrawn = list(zip(all_goals_h[:, i], all_goals_a[:, i]))
+        result = sim_tournament(strengths_fn, current_elo, rng, known_results, predrawn)
         for team, stage in result.items():
             idx = STAGE_ORDER.index(stage)
             for s in STAGE_ORDER[:idx+1]:
@@ -573,27 +635,40 @@ def main():
     print("Loading data...")
     results, current_elo = load_data()
 
-    print(f"Computing historical ELO from {len(results):,} matches...")
-    elo_history, computed_elo = compute_historical_elo(results)
+    regressions = load_cache()
+    if regressions is None:
+        print(f"Computing historical ELO from {len(results):,} matches...")
+        elo_history, computed_elo = compute_historical_elo(results)
 
-    sched_teams = [t for members in GROUPS.values() for t in members]
-    print(f"Building per-team training datasets (since {CUTOFF_DATE})...")
-    team_data = build_team_datasets(results, elo_history, sched_teams)
-    counts    = {t: len(v) for t, v in team_data.items()}
-    min_t = min(counts, key=counts.get)
-    max_t = max(counts, key=counts.get)
-    print(f"  Match counts: min={counts[min_t]} ({min_t}), max={counts[max_t]} ({max_t})")
+        sched_teams = [t for members in GROUPS.values() for t in members]
+        print(f"Building per-team training datasets (since {CUTOFF_DATE})...")
+        team_data = build_team_datasets(results, elo_history, sched_teams)
+        counts    = {t: len(v) for t, v in team_data.items()}
+        min_t = min(counts, key=counts.get)
+        max_t = max(counts, key=counts.get)
+        print(f"  Match counts: min={counts[min_t]} ({min_t}), max={counts[max_t]} ({max_t})")
 
-    print("Fitting per-team Poisson regressions...")
-    regressions = fit_team_regressions(team_data)
+        print("Fitting per-team Poisson regressions...")
+        regressions = fit_team_regressions(team_data)
+        save_cache(regressions)
+        print("  Regressions cached to wc2026_cache.json")
+    else:
+        computed_elo = {}
+        print("Loaded regressions from cache (delete wc2026_cache.json to refit).")
 
     def strengths(team_a, team_b):
         elo_a = current_elo.get(team_a, computed_elo.get(team_a, ELO_START))
         elo_b = current_elo.get(team_b, computed_elo.get(team_b, ELO_START))
         return expected_goals(team_a, team_b, elo_a, elo_b, regressions)
 
+    known_results = load_known_results()
+    n_group  = len(known_results.get('group', {}))
+    n_ko     = len(known_results.get('knockout', {}))
+    if n_group or n_ko:
+        print(f"Loaded {n_group} group result(s) and {n_ko} knockout result(s) from match_results.json")
+
     print(f"Running {N_SIMS:,} tournament simulations...")
-    probs = run_simulations(strengths, current_elo)
+    probs = run_simulations(strengths, current_elo, known_results=known_results)
 
     print_results(probs, regressions, current_elo)
     save_results_csv(probs, regressions, current_elo,

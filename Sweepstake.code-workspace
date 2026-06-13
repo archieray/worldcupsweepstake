@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "Sweepstake",
+			"path": "."
+		},
+		{
+			"name": "matchdata",
+			"path": "../Downloads/matchdata"
+		},
+		{
+			"name": "archive",
+			"path": "../Downloads/archive"
+		}
+	],
+	"settings": {}
+}
